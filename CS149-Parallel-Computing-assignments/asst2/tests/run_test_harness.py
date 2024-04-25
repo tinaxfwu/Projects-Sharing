@@ -25,6 +25,7 @@ LIST_OF_TESTS = [
     ("math_operations_in_tight_for_loop_reduction_tree", UNSPECIFIED_NUM_THREADS),
     ("spin_between_run_calls", UNSPECIFIED_NUM_THREADS),
     ("mandelbrot_chunked", UNSPECIFIED_NUM_THREADS),
+    ("matrix_multiply", UNSPECIFIED_NUM_THREADS),
 ]
 
 LIST_OF_IMPLEMENTATIONS_ORIG = [

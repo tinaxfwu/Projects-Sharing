@@ -48,6 +48,14 @@ You have already encountered mutexes in prior courses like CS110.  A thread lock
 
 For those interested, C++ provides a number of wrapper classes that are designed to reduce bugs when using locks (e.g., forgetting to unlock a mutex).  You may wish to look at the definitions of [`std::unique_lock`](https://en.cppreference.com/w/cpp/thread/unique_lock) and [`std::lock_guard`](https://en.cppreference.com/w/cpp/thread/lock_guard).  For example `lock_guard` automatically locks a specified mutex on construction, and unlocks the mutex when it is goes out of scope.
 
+Alycia's notes:
+- use `std::unique_lock` when you need to lock and unlock a mutex multiple times, or need fine control over the locking mechanism
+    - `std::unique_lock` is used to automatically lock and unlock the mutex when we enter and exit the scope. This is safer than manually locking and unlocking, because it ensures that the mutex gets unlocked even if an exception is thrown.
+- use `std::lock_guard` if you simply need to keep a mutex locked during a particular scope:
+    - When a std::lock_guard object is created, it automatically takes ownership of the mutex. 
+    - When control leaves the scope in which the std::lock_guard object was created, the std::lock_guard is destructed and the mutex is released. 
+    - It’s simpler and more restrictive than std::unique_lock, as it keeps the mutex locked for its entire lifetime.
+
 We recommend that you take a look at the function `mutex_example()` in `tutorial/tutorial.cpp` for a simple example of using a mutex to protect updates to a shared counter.  In this example, the mutex is used to ensure the read-modify-write to the counter is performed atomically.
 
 ## Condition Variables ##
@@ -69,6 +77,13 @@ Additional references:
 
 * <https://thispointer.com/c11-multithreading-part-7-condition-variables-explained>
 * <https://www.modernescpp.com/index.php/condition-variables>
+
+
+Alycia's notes:
+- thread takes a lock, but conditions aren't right for it to continue. so the thread donates the lock through `wait()` and lets someone else take the lock. That someone else (thread) can take the lock and update the condition.
+- condition variable guards a more abstract condition
+- when you hold a lock, you guarantee any state that you modify while holding that lock doesn't change
+- grab a lock, evaluate a condition, decide if you need to sleep based on condition or continue on
 
 ## C++ Atomics ##
 

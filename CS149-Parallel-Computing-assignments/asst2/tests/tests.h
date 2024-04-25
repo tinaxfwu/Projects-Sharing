@@ -23,6 +23,7 @@ TestResults mathOperationsInTightForLoopFanInTest(ITaskSystem* t);
 TestResults mathOperationsInTightForLoopReductionTreeTest(ITaskSystem* t);
 TestResults spinBetweenRunCallsTest(ITaskSystem *t);
 TestResults mandelbrotChunkedTest(ITaskSystem* t);
+TestResults matrixTestSync(ITaskSystem* t);
 
 Async with dependencies tests
 =============================
@@ -37,6 +38,7 @@ TestResults mathOperationsInTightForLoopReductionTreeAsyncTest(ITaskSystem* t);
 TestResults spinBetweenRunCallsAsyncTest(ITaskSystem *t);
 TestResults mandelbrotChunkedAsyncTest(ITaskSystem* t);
 TestResults simpleRunDepsTest(ITaskSystem *t);
+TestResults matrixTestAsync(ITaskSystem* t);
 */
 
 /*
@@ -112,6 +114,177 @@ TestResults yourTest(ITaskSystem* t, bool do_async, int num_elements, int num_bu
 
     return results;
 }
+
+class MatrixTask : public IRunnable {
+    public:
+        int* input_array_;
+        int* output_array_;
+        int matrixSize_; // size of matrix (matrixSize_ x matrixSize_)
+
+        MatrixTask(int* input_array, int* output_array, int matrixSize) 
+            :  input_array_(input_array), output_array_(output_array), matrixSize_(matrixSize){}
+        ~MatrixTask() {}
+        
+        void runTask(int task_id, int num_total_tasks) {
+            int element_per_task = (matrixSize_ + num_total_tasks-1) / num_total_tasks;
+            int startRow = task_id * element_per_task;
+            int endRow = std::min(startRow + element_per_task, matrixSize_);
+
+            for(int i = startRow; i < endRow; i++) {
+                for(int j = 0; j < matrixSize_; j++) {
+                    int sum = 0;
+                    for(int k = 0; k < matrixSize_; k++) {
+                        sum += input_array_[i * matrixSize_ + k] * input_array_[k * matrixSize_ + j];
+                    }
+                    output_array_[i * matrixSize_ + j] = sum;
+                }
+            }
+
+        }
+};
+
+void printMatrix(const char* label, int* matrix, int matrixSize) {
+    printf("%s:\n", label);
+    for(int i = 0; i < matrixSize; i++) {
+        for(int j = 0; j < matrixSize; j++) {
+            printf("%d ", matrix[i * matrixSize + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+int* computeFinalValue(int* original, int matrixSize, int num_multiplications) {
+    int* temp_in = new int[matrixSize * matrixSize]();
+    int* temp_out = new int[matrixSize * matrixSize]();
+    memcpy(temp_in, original, matrixSize * matrixSize * sizeof(int));
+    
+    for(int k = 0; k < num_multiplications; k++) {
+        for(int i = 0; i < matrixSize; i++) {
+            for(int j = 0; j < matrixSize; j++) {
+                int sum = 0;
+                for(int l = 0; l < matrixSize; l++) {
+                    sum += temp_in[i * matrixSize + l] * temp_in[l * matrixSize + j];
+                }
+                temp_out[i * matrixSize + j] = sum;
+            }
+        }
+        std::swap(temp_in, temp_out);
+    }
+    int* result = new int[matrixSize * matrixSize];
+    memcpy(result, temp_in, matrixSize * matrixSize * sizeof(int));
+    delete[] temp_in;
+    delete[] temp_out;
+    return result;
+}
+
+
+
+/*
+ * Implement your test here. Call this function from a wrapper that passes in
+ * do_async and num_elements. See `simpleTest`, `simpleTestSync`, and
+ * `simpleTestAsync` as an example.
+ */
+TestResults MatrixTest(ITaskSystem* t, bool do_async, int matrixSize) {
+
+    int num_tasks = 4;
+    int num_bulk_task_launches = 4;   
+
+    int num_elements = matrixSize * matrixSize;
+    int* input = new int[num_elements](); 
+    int* output = new int[num_elements](); 
+    int* original = new int[num_elements]();
+    
+    // init input
+    // Randomly set 10% of the matrix elements to random values
+    int num_random_elements = num_elements / 10;
+    srand(5);
+    for(int i=0; i<num_random_elements; i++){
+        int row = rand() % matrixSize;
+        int col = rand() % matrixSize;
+        input[row * matrixSize + col] = rand() % 32 + 1;  
+        // input[row * matrixSize + col] = 1;
+    }
+    memcpy(original, input, num_elements * sizeof(int));
+
+    // printMatrix("Input", input, matrixSize);
+    std::vector<MatrixTask*> runnables(num_bulk_task_launches);
+
+    for (int i=0; i<num_bulk_task_launches; i++) {
+        if (i % 2 == 0)
+            runnables[i] = new MatrixTask(input, output, matrixSize);
+        else
+            runnables[i] = new MatrixTask(output, input, matrixSize);
+    }
+
+    double start_time = CycleTimer::currentSeconds();
+    TaskID prev_task_id;
+
+    for(int i=0; i<num_bulk_task_launches; i++) {
+        if (do_async) {
+            std::vector<TaskID> deps;
+            if (i > 0) {
+                deps.push_back(prev_task_id);
+            }
+            prev_task_id = t->runAsyncWithDeps(
+                runnables[i], num_tasks, deps);
+        } else {
+            t->run(runnables[i], num_tasks);
+        }
+    }
+    if (do_async)
+        t->sync();
+    double end_time = CycleTimer::currentSeconds();
+
+    // printMatrix("Original", original, matrixSize);
+    
+    // printf("--------------\n");
+    // printMatrix("Input", input, matrixSize);
+    // printMatrix("Output", output, matrixSize);
+
+    // Correctness validation
+    TestResults results;
+    results.passed = true; 
+    int* buffer = (num_bulk_task_launches % 2 == 1) ? output : input;
+    // printMatrix("buffer", buffer, matrixSize);
+    
+    int* answer = computeFinalValue(original, matrixSize, num_bulk_task_launches);
+    // printMatrix("Answer from computeFinalValue", answer, matrixSize);
+
+    for(int i=0; i<num_elements; i++){
+        int value = answer[i];
+
+        int expected = value;
+        if (buffer[i] != expected) {
+            results.passed = false;
+            printf("%d: %d expected=%d\n", i, buffer[i], expected);
+            break;
+        }
+    }
+    results.time = end_time - start_time;
+
+    delete [] input;
+    delete [] output;
+    delete [] original;
+    delete [] answer;
+    for (int i=0; i<num_bulk_task_launches; i++)
+        delete runnables[i];
+
+    return results;
+}
+
+TestResults matrixTestSync(ITaskSystem* t) {
+    int matrix_size = 1024;
+    return MatrixTest(t, false, matrix_size);
+}
+
+TestResults matrixTestAsync(ITaskSystem* t) {
+    int matrix_size = 1024;
+    return MatrixTest(t, true, matrix_size);
+}
+
+
+
 
 /*
  * ==================================================================

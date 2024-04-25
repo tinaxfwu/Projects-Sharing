@@ -83,6 +83,8 @@ int main(int argc, char** argv)
         strictGraphDepsSmall,
         strictGraphDepsMedium,
         strictGraphDepsLarge,
+        matrixTestSync,
+        matrixTestAsync,
     };
 
     std::string test_names[n_tests] = {
@@ -115,6 +117,8 @@ int main(int argc, char** argv)
         "strict_graph_deps_small_async",
         "strict_graph_deps_med_async",
         "strict_graph_deps_large_async",
+        "matrix_multiply",
+        "matrix_multiply_async",
     };
  
     // Parse commandline options
