@@ -18,6 +18,7 @@
 # define SCAN_BLOCK_DIM 1024
 #include "exclusiveScan.cu_inl"
 #include "circleBoxTest.cu_inl"
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // Putting all the cuda kernels here
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -321,13 +322,6 @@ __global__ void kernelAdvanceSnowflake() {
 // given a pixel and a circle, determines the contribution to the
 // pixel from the circle.  Update of the image is done in this
 // function.  Called by kernelRenderCircles()
-
-// extra bollean compile 
-// one for snowflake, one for snowflake single frame
-// make two kernel functions
-// use template tto different cases to reduce if-else check 
-// template <compile time argument>
-// constant geneic programming
 template<bool isSnowFlake>
 __device__ __inline__ void
 shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
@@ -354,9 +348,8 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
     // would be wise to perform this logic outside of the loop next in
     // kernelRenderCircles.  (If feeling good about yourself, you
     // could use some specialized template magic).
-
+    // if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
     if (isSnowFlake) {
-
         const float kCircleMaxAlpha = .5f;
         const float falloffScale = 4.f;
 
@@ -391,7 +384,6 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 
     // END SHOULD-BE-ATOMIC REGION
 }
-
 
 // kernelRenderCircles -- (CUDA device code)
 //
@@ -435,14 +427,13 @@ __global__ void kernelRenderCircles() {
         for (int pixelX=screenMinX; pixelX<screenMaxX; pixelX++) {
             float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), // +0.5f here to get the center of the pixel
                                                  invHeight * (static_cast<float>(pixelY) + 0.5f));
+            // shadePixel(index, pixelCenterNorm, p, imgPtr);
             if(cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME){
                 shadePixel<true>(index, pixelCenterNorm, p, imgPtr);
             }
             else{
                 shadePixel<false>(index, pixelCenterNorm, p, imgPtr);
             }
-
-
             imgPtr++;
         }
     }
@@ -467,20 +458,21 @@ __global__ void kernelRenderImageTiles() {
 
     // Get pixel indices to compute pixelCenterNorm and imgPtr
     // TODO: add check for pixelX and pixelY to ensure they are within image width/height
-    // int pixelX = blockIdx.x * blockDim.x + threadIdx.x; // [0, IMAGE_SIZE - 1]
-    // int pixelY = blockIdx.y * blockDim.y + threadIdx.y;// [0, IMAGE_SIZE - 1]
-
-    int imageWidth = cuConstRendererParams.imageWidth;
-    int imageHeight = cuConstRendererParams.imageHeight;
-    float invWidth = 1.f / imageWidth;
-    float invHeight = 1.f / imageHeight;
-
-    // Get pixel indices to compute pixelCenterNorm and imgPtr
     int pixelX = blockIdx.x * blockDim.x + threadIdx.x; // [0, IMAGE_SIZE - 1]
     int pixelY = blockIdx.y * blockDim.y + threadIdx.y;// [0, IMAGE_SIZE - 1]
+
+    //short imageWidth = cuConstRendererParams.imageWidth;
+    //short imageHeight = cuConstRendererParams.imageHeight;
+    int imageWidth = cuConstRendererParams.imageWidth;
+    int imageHeight = cuConstRendererParams.imageHeight;
+    
+    // clamp pixelX and pixelY
     pixelX = min(pixelX, imageWidth-1);
     pixelY = min(pixelY, imageHeight-1);
 
+    
+    float invWidth = 1.f / imageWidth;
+    float invHeight = 1.f / imageHeight;
     float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
                                          invHeight * (static_cast<float>(pixelY) + 0.5f));
     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
@@ -492,13 +484,14 @@ __global__ void kernelRenderImageTiles() {
     float boxR = boxL + invWidth * static_cast<float>(blockDim.x);
     float boxB = invHeight * static_cast<float>(blockIdx.y * blockDim.y);
     float boxT = boxB + invHeight * static_cast<float>(blockDim.y);
+
+    // clamp box_
     boxL = max(boxL, 0.0f);
     boxB = max(boxB, 0.0f);
     boxR = min(boxR, invWidth * (imageWidth - 1));
     boxT = min(boxT, invHeight * (imageHeight - 1));
-
-
-
+    
+    
     int threadIndex = threadIdx.x + threadIdx.y * blockDim.x; // [0, SCAN_BLOCK_DIM - 1]
 
     int circleIndex;
@@ -525,6 +518,10 @@ __global__ void kernelRenderImageTiles() {
         __syncthreads();
         // numberOverlappingCircles = scanOutput[-1] + 1 (if maskArray[-1] == 1)
         numberOverlappingCircles = overlappingCircleMaskArray[SCAN_BLOCK_DIM - 1] + isLastCircleOverlapping;
+        // Quit early from this iteration if none of the batch of SCAN_BLOCK_DIM circles are overlapping
+        if (numberOverlappingCircles == 0) {
+            continue;
+        }
         // if exclusivescan[i] != exclusivescan[i+1]:
         //     overlappingCircleIndices[exclusivescan[i]] = i
         if (threadIndex < SCAN_BLOCK_DIM -1 && overlappingCircleMaskArray[threadIndex] != overlappingCircleMaskArray[threadIndex + 1])
@@ -541,6 +538,7 @@ __global__ void kernelRenderImageTiles() {
         for (int index = 0; index < numberOverlappingCircles; index++) {
             circleIndex = overlappingCircleIndices[index];
             float3 circlePosition = *(float3*)(&cuConstRendererParams.position[3 * circleIndex]);
+            // shadePixel(circleIndex, pixelCenterNorm, circlePosition, &imgLocal);
             if(cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME){
                 shadePixel<true>(circleIndex, pixelCenterNorm, circlePosition, &imgLocal);
             }

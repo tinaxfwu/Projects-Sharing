@@ -176,12 +176,12 @@ While running the test, we show results of the pytorch profiler - this informati
 
 After the table is dumped, we also display two relevant statistics, cpu time (in milliseconds) and mem usage (in bytes). If you implemented your function correctly you should see those two values output like so:
 
-    STUDENT - NAIVE ATTENTION statistics
-    cpu time:  232.561ms
-    mem usage:  4718588 bytes
-
     REFERENCE - NAIVE ATTENTION statistics
     cpu time:  230.724ms
+    mem usage:  4718588 bytes
+    
+    STUDENT - NAIVE ATTENTION statistics
+    cpu time:  232.561ms
     mem usage:  4718588 bytes
 
 If your attention is not producing the correct output, you will see the following message:
@@ -192,11 +192,15 @@ Note that you do not have to exactly match the reference `cpu time,` as long as 
 
 Note that the memory usage value will not change even if you allocate more intermediate variables then we give you. This memory usage is only profiled from the variables passed in as arguments. For each Parts (1-4), we provide you with the minimum amount of variables to produce the correct result. **You can also assume that all the temporary intermediate tensors that we have passed in are initialized to contain zeros.** We do this because we want you to see how the memory usage goes down as operations get fused and there will be writeup questions based on these memory values. Adding any more high memory data structures will most likely only hurt your performance, but you are welcome to try adding additional variables in your `module.cpp` file and you will not be penalized.
 
+You should be sure to test that your function works for different values of N, as this is how we will be grading you on correctness. We have provided a command line argument that works as so:
+
+    python3 gpt149.py part1 -N <val>
+
 If you have implemented your attention layer, you can also see the DNN use your attention layer to generate text, optionally changing the model to `shakes256`, `shakes1024`, or `shakes2048` if you wish to output more text:
 
     python3 gpt149.py part1 --inference -m shakes128
 
-Note that you will not be autograded on inference, and this is purely for fun. Parts 1-3 all follow the same grading procedure listed here in this section.
+Note that you will not be autograded on inference, and this is purely for fun. Please also note that the models `shakes1024` and `shakes2048` will not work with the softmax we describe in this writeup due to overflow errors. If you wish to have them work, you must implement the "safe" softmax described in class. This is completely optional as we will always make sure to give you nice values when grading. Parts 1-3 all follow the same grading procedure listed here in this section.
 
 ### What to submit
 
@@ -232,12 +236,12 @@ Run the following test to check your program's correctness:
 
 A correct implementation should yield the following output:
 
-    STUDENT - BLOCKED MATMUL + UNFUSED SOFTMAX statistics
-    cpu time:  160.891ms
-    mem usage:  4718588 bytes
-
     REFERENCE - BLOCKED MATMUL + UNFUSED SOFTMAX statistics
     cpu time:  156.271ms
+    mem usage:  4718588 bytes
+
+    STUDENT - BLOCKED MATMUL + UNFUSED SOFTMAX statistics
+    cpu time:  160.891ms
     mem usage:  4718588 bytes
 
 An incorrect implementation will have the output:
@@ -246,11 +250,15 @@ An incorrect implementation will have the output:
 
 Just as in Part 1, we will autograde the correctness of your function's output and its CPU time. You have the same buffer of <=15ms of the reference solution. If your program is faster you will not be penalized.
 
+You should be sure to test that your function works for different values of N, as this is how we will be grading you on correctness. We have provided a command line argument that works as so:
+
+    python3 gpt149.py part2 -N <val>
+
 You can see the DNN use your attention layer to generate text, optionally changing the model to `shakes256`, `shakes1024`, or `shakes2048` if you wish to output more text:
 
     python3 gpt149.py part2 --inference -m shakes128
 
-Note that you will not be autograded on inference, and this is purely for fun.
+Note that you will not be autograded on inference, and this is purely for fun. Please also note that the models `shakes1024` and `shakes2048` will not work with the softmax we describe in this writeup due to overflow errors. If you wish to have them work, you must implement the "safe" softmax described in class. This is completely optional as we will always make sure to give you nice values when grading.
 
 ### What to submit
 * Implement `myUnfusedAttentionBlocked` in `module.cpp`.
@@ -294,12 +302,12 @@ Run the following test to check your program's correctness:
 
 A correct implementation should yield the following output:
 
-    STUDENT - FUSED ATTENTION statistics
-    cpu time:  33.209ms
-    mem usage:  557052 bytes
-
     REFERENCE - FUSED ATTENTION statistics
     cpu time:  32.361ms
+    mem usage:  557052 bytes
+
+    STUDENT - FUSED ATTENTION statistics
+    cpu time:  33.209ms
     mem usage:  557052 bytes
 
 An incorrect implementation will have the output:
@@ -308,11 +316,15 @@ An incorrect implementation will have the output:
 
 Just as in Parts 1 & 2, we will autograde the correctness of your function's output and its CPU time. You have the same buffer of <=15ms of the reference solution. If your program is faster you will not be penalized.
 
+You should be sure to test that your function works for different values of N, as this is how we will be grading you on correctness. We have provided a command line argument that works as so:
+
+    python3 gpt149.py part3 -N <val>
+
 Now, you can see the DNN use your attention layer to generate text, optionally changing the model to `shakes256`, `shakes1024`, or `shakes2048` if you wish to output more text:
 
     python3 gpt149.py part3 --inference -m shakes128
 
-Note that you will not be autograded on inference, and this is purely for fun.
+Note that you will not be autograded on inference, and this is purely for fun. Please also note that the models `shakes1024` and `shakes2048` will not work with the softmax we describe in this writeup due to overflow errors. If you wish to have them work, you must implement the "safe" softmax described in class. This is completely optional as we will always make sure to give you nice values when grading.
 
 ### What to submit
 * Implement `myFusedAttention` in `module.cpp`.
@@ -340,13 +352,13 @@ It follows that if we have two BLOCKSIZE vectors, denoted as $x \in \mathbb{R}^{
 
 
 ### Implement Flash Attention
-Your job is to break softmax into blocks so it can be fused with your blocked matrix multiply. Therefore, for each block, you will multiply $Q$ (BLOCKROWSIZE x d) with $K^{t}$ (d x BLOCKCOLUMNSIZE) to get $QK^t$ (BLOCKROWSIZE x BLOCKCOLUMNSIZE). Then, you will calculate $softmax(QK^t)$ (BLOCKROWSIZE x 1) and multiply this with $V$ (BLOCKCOLUMNSIZE x d) to get $O$ (BLOCKROWSIZE x d). Remember, this is an accumulative process just like blocked matrix multiply!
+Your job is to break softmax into blocks so it can be fused with your blocked matrix multiply. Therefore, for each block, you will multiply $Q$ (BLOCKROWSIZE x d) with $K^{t}$ (d x BLOCKCOLUMNSIZE) to get $QK^t$ (BLOCKROWSIZE x BLOCKCOLUMNSIZE). Then, you will calculate $\texttt{softmax}(QK^t)$ (BLOCKROWSIZE x BLOCKCOLUMNSIZE) and multiply this with $V$ (BLOCKCOLUMNSIZE x d) to get $O$ (BLOCKROWSIZE x d). Remember, this is an accumulative process just like blocked matrix multiply!
 
 By doing this we can significantly decrease the memory footprint. Rather than having a memory footprint of $O(N^{2})$, we will be able to reduce this to a linear scaling footprint of $O(N)$.
 
 ### Flash Attention Pseudocode
 
-The flash attention algorithm shown below, imports blocks of the matrices $Q$, $K$, and $V$ into smaller physical tiles. It then computes a local softmax in each tile, and then writes this result tile back to the full output matrix $O$. For $Q$, for example, each tile's size is (Br x d), and the tile size for $K$ is (Bc x d). Calculating $Br$ and $Bc$, as shown in the pseudocode below,  requires knowing the size $M$ of your SRAM/cache, which in this case is $M=131072$ floats. However, this number for $M$ is a suggestion - you are free to set $Br$ and $Bc$ to whatever values you find give you best performance. 
+The flash attention algorithm shown below, imports blocks of the matrices $Q$, $K$, and $V$ into smaller physical tiles. It then computes a local softmax in each tile, and then writes this result tile back to the full output matrix $O$. For $Q$, for example, each tile's size is (Br x d), and the tile size for $K$ is (Bc x d). Calculating $Br$ and $Bc$, as shown in the pseudocode below, requires knowing the size $M$ of your SRAM/cache, which in this case is $M=131072$ floats. For the purposes of this programming assignment, your program should be able to handle any $Br/Bc$ we give it.
 
 <p align="center">
   <img src="https://github.com/stanford-cs149/cs149gpt/blob/main/assets/FlashAttentionPseudo.png" width=65% height=65%>
@@ -357,18 +369,18 @@ Run the following test to check your program's correctness:
 
     python3 gpt149.py part4
 
-Feel free to change the $Br$ and $Bc$ parameters of the attention algorithm with the flags `-br <value>` and `-bc <value>`. The default values for each are $256$. For example, if I wanted to change $Br$ to $128$ and $Bc$ to $128$ I would run:
+**Make sure to test your implementation on different block sizes.** When running this test, the default values of $N$ and $d$ are $1024$ and $32$ respectively. Make sure that your program is able to handle any block size, whether your block size evenly divides into these values of $N/d$ or not. We have given you commandline flags to change the $Br$ and $Bc$ parameters of the attention algorithm. You can do this with the flags `-br <value>` and `-bc <value>`. The default values for each are $256$. For example, if I wanted to change $Br$ to $128$ and $Bc$ to $512$ I would run:
 
-    python3 gpt149.py part4 -br 128 -bc 128
+    python3 gpt149.py part4 -br 128 -bc 512
 
 A correct implementation should yield the following output:
 
-    STUDENT - FLASH ATTENTION statistics
-    cpu time:  462.853ms
+    REFERENCE - FLASH ATTENTION statistics
+    cpu time:  435.709ms
     mem usage:  524284 bytes
 
-    REFERENCE - FLASH ATTENTION statistics
-    cpu time:  462.85ms
+    STUDENT - FLASH ATTENTION statistics
+    cpu time:  435.937ms
     mem usage:  524284 bytes
 
 An incorrect implementation will have the output:
@@ -377,13 +389,17 @@ An incorrect implementation will have the output:
 
 Notice that the cpu speed is actually lower than Part 3. Why is this the case? You will answer this question in your writeup below.
 
-**For this problem only**, you will be graded solely on correctness and not performance. The grading consists on an automated check that your algorithm produced the correct output and a manual check that you followed the pseudocode from above. If you ran the command `python3 gpt149.py part4` and you saw the output above that is associated with a correct implementation and DID NOT see: `YOUR ATTENTION PRODUCED INCORRECT RESULTS`, then you passed the autograded portion. If you followed the pseudocode from the image above, then you will pass the manual check.
+You should be sure to test that your function works for different values of N, as this is how we will be grading you on correctness. You should test different Ns as well as different block_sizes. Please note that the reference solution runs first, so if the reference solution fails then you do not have to worry about that combination of N/Br/Bc. To change the values of N, Br, and Bc:
+
+    python3 gpt149.py part4 -N <val> -br <val> -bc <val>
+
+**For this problem only**, you will be graded solely on correctness and not performance. The grading consists on an automated check that your algorithm produced the correct output and a manual check that you followed the pseudocode from above. If you ran the command `python3 gpt149.py part4` and you saw the output above that is associated with a correct implementation and DID NOT see: `YOUR ATTENTION PRODUCED INCORRECT RESULTS`, then you passed the autograded portion. For the correctness check, we also reserve the right to change the values of N, Br, and Bc. If you followed the pseudocode from the image above, then you will pass the manual check.
 
 Now, you can see the DNN use your attention layer to generate text, optionally changing the model to `shakes256`, `shakes1024`, or `shakes2048` if you wish to output more text:
 
     python3 gpt149.py part4 --inference -m shakes128
 
-Note that you will not be autograded on inference, and this is purely for fun.
+Note that you will not be autograded on inference, and this is purely for fun. Please also note that the models `shakes1024` and `shakes2048` will not work with the softmax we describe in this writeup due to overflow errors. If you wish to have them work, you must implement the "safe" softmax described in class. This is completely optional as we will always make sure to give you nice values when grading.
 
 ### What to submit
 * Implement `myFlashAttention` in `module.cpp`. 
